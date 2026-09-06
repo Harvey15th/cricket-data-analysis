@@ -192,12 +192,12 @@ Create `outputs/metrics.json` containing the configuration, data snapshot metada
 The exact command names may change, but the MVP should support this workflow:
 
 ```bash
-python -m cricket_elo prepare \
-  --input data/raw/t20s_male_json.zip \
+python -m src/cricket_elo prepare `
+  --input data/t20s_male_json `
   --output data/processed/matches.csv
 
-python -m cricket_elo evaluate \
-  --matches data/processed/matches.csv \
+python -m cricket_elo evaluate `
+  --matches data/processed/matches.csv `
   --output-dir outputs
 
 python -m cricket_elo rankings --top 20
