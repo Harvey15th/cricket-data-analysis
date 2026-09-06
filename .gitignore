@@ -2,6 +2,7 @@
 *.json
 data/t20s_male_json/README.txt
 *.csv
+*.zip
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
