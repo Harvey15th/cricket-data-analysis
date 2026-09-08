@@ -23,14 +23,14 @@ for file in os.listdir(INPUT_PATH):
         date = matchData['info']['dates'][0]
         team_1 = matchData['info']['teams'][0]
         team_2 = matchData['info']['teams'][1]
+        match_type = matchData['info']['match_type']
         try:
             result = 'win'
             winner = matchData['info']['outcome']['winner']
+            processed_data = [match_id, date, team_1, team_2, winner, match_type]
         except:
             result = matchData['info']['outcome']['result']
-        match_type = matchData['info']['match_type']
-
-        processed_data = [match_id, date, team_1, team_2, winner, match_type]
+            processed_data = [match_id, date, team_1, team_2, result, match_type]
         Processed_2D.append(processed_data)
 
 Processed_2D.sort(key = lambda x: x[1])
