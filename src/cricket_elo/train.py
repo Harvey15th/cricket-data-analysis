@@ -12,18 +12,26 @@ def train(input_filepath, output_path):
 
     for matchID in matchIDs:
         match = matches[matchID]
-        adjust_elo(match[0], match[1], match[2])
+        change = adjust_elo(match[0], match[1], match[2])
+        Ka = 64 if teams[match[0]].match_history()['matches_played'] >= 7 else 100
+        Kb = 64 if teams[match[1]].match_history()['matches_played'] >= 7 else 100
+
+        teams[match[0]].update_elo(change * Ka)
+        teams[match[1]].update_elo(-change * Kb)
+
+        teams[match[0]].add_match()
+        teams[match[1]].add_match()
 
     for teamname in teamnames:
         with open(output_path, 'a') as f:
-            f.write(f'{teamname}, {round(teams[teamname].get_elo())} \n')
+            f.write(f'{teamname},{round(teams[teamname].get_elo())},{teams[teamname].match_history()['matches_played']}\n')
 
     return True
 
 def adjust_elo(team1, team2, result):
     score = 0
     if result == 'no result':
-        return
+        return 0
     elif result == 'tie':
         score = 0.5
     elif result == team1:
@@ -32,13 +40,8 @@ def adjust_elo(team1, team2, result):
         score = 0
 
     Ea = expProb(teams[team1].get_elo(), teams[team2].get_elo())
-    change = (score - Ea)
+    return (score - Ea)
 
-    Ka = 32 if teams[team1].match_history()['matches_played'] >= 7 else 100 - teams[team1].match_history()['matches_played']
-    Kb = 32 if teams[team2].match_history()['matches_played'] >= 7 else 100 - teams[team2].match_history()['matches_played']
-
-    teams[team1].update_elo(change * Ka)
-    teams[team2].update_elo(-change * Kb)
 
 def expProb(Ra, Rb):
     exponent = (Rb - Ra) / 400
