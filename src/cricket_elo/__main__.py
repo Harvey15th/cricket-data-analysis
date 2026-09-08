@@ -51,12 +51,10 @@ if __name__ == "__main__":
             raise ValueError("Input data path must be provided for benchmarking")
         if args.input_data_verification is '':
             raise ValueError("input_data_verification must be provided for benchmarking")
-        if args.output_path is '':
-            raise ValueError("Output path must be provided for benchmarking")
         
         #Benchmarking
-        if benchmark(args.input_data, args.input_data_verification, args.output_path):
-            print(f"Successful! Results added to {args.output_path}")
+        if benchmark(args.input_data, args.input_data_verification):
+            print(f"Successful!")
         else:
             print("Benchmark Unsuccessful")
     
