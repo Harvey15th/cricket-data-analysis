@@ -1,0 +1,27 @@
+# Automatically identify text files and normalise their repository line endings.
+* text=auto
+
+# Use LF for source code, documentation, configuration and small data fixtures.
+*.py text eol=lf
+*.md text eol=lf
+*.toml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.csv text eol=lf
+*.txt text eol=lf
+
+# Preserve conventional Windows line endings for Windows command scripts.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Do not perform text conversion on binary files.
+*.zip binary
+*.gz binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.pyc binary
