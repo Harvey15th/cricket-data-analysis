@@ -7,10 +7,7 @@ teams : Dict[str, team] = {}
 matches : Dict[int, List[str]] = {}
 matchIDs : List[int] = []
 
-def train(args):
-    input_filepath = args.input_data
-    output_path = args.output
-
+def train(input_filepath, output_path):
     prepareData(input_filepath)
 
     for matchID in matchIDs:

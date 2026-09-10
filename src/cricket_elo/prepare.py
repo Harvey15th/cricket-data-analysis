@@ -2,16 +2,12 @@ import argparse
 import json
 import os
 
-def prepare(args):
-
-    INPUT_PATH = args.input
-    OUTPUT_PATH = args.output
-
+def prepare(input, output):
     Processed_2D = []
 
-    for file in os.listdir(INPUT_PATH):
+    for file in os.listdir(input):
         if file.endswith('.json'):
-            with open(os.path.join(INPUT_PATH, file), 'r') as f:
+            with open(os.path.join(input, file), 'r') as f:
                 matchData = json.load(f)
 
 
@@ -35,7 +31,9 @@ def prepare(args):
         processed_data = ','.join(processed_data)
         processed_data += "\n"
 
-        with open(OUTPUT_PATH, 'a') as f:
+        with open(output, 'a') as f:
             f.write(processed_data)
+
+    return True
 
             

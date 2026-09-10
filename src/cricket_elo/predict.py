@@ -4,11 +4,10 @@ import math
 teamnames : List[str] = []
 teams : Dict[str, List[int]] = {}
 
-def predict(args):
+def predict(ratings, team1, team2):
 
-    input_filepath = args.ratings
-    team1 = args.team_a
-    team2 = args.team_b
+    input_filepath = ratings
+
     with open(input_filepath, 'r') as f:
         for line in f.readlines():
             line = line.split(',')

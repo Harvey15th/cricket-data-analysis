@@ -26,11 +26,10 @@ def prepareData(input_filepath):
     matchIDs.sort()
     return
 
-def benchmark(args):
+def benchmark(training_data, verification_data):
 
-    input_data = args.training_data
-    verification_data = args.verification_data
-    
+    input_data = training_data
+
     train(input_data, "outputs/validation_elos.csv")
 
     with open("outputs/validation_elos.csv", 'r') as f:
