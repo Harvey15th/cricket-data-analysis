@@ -1,5 +1,15 @@
 import argparse
+from .benchmark import benchmark
+from .predict import predict
+from .prepare import prepare
+from .train import train
 
+def main_cli():
+    parser = build_parser()
+    args = parser.parse_args()
+    result = args.func(args)
+
+    return result
 
 def build_parser() -> argparse.ArgumentParser:
     """Create and return the Cricket Elo argument parser."""
@@ -18,6 +28,9 @@ def build_parser() -> argparse.ArgumentParser:
         "prepare",
         help="Convert Cricsheet JSON files into processed match data.",
     )
+    prepare_parser.set_defaults(
+        func = prepare
+    )
     prepare_parser.add_argument(
         "--input",
         required=True,
@@ -33,6 +46,9 @@ def build_parser() -> argparse.ArgumentParser:
         "train",
         help="Calculate Elo ratings from processed match data.",
     )
+    train_parser.set_defaults(
+        func = train
+    )
     train_parser.add_argument(
         "--input-data",
         required=True,
@@ -47,6 +63,9 @@ def build_parser() -> argparse.ArgumentParser:
     predict_parser = subparsers.add_parser(
         "predict",
         help="Estimate the win probability between two teams.",
+    )
+    predict_parser.set_defaults(
+        func = predict
     )
     predict_parser.add_argument(
         "--ratings",
@@ -67,6 +86,9 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_parser = subparsers.add_parser(
         "benchmark",
         help="Run the experimental Elo benchmark.",
+    )
+    benchmark_parser.set_defaults(
+        func = benchmark
     )
     benchmark_parser.add_argument(
         "--training-data",
