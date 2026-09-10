@@ -1,5 +1,4 @@
-from team import team
-from train import adjust_elo, train, expProb
+from .train import adjust_elo, train, expProb
 from typing import Dict, List
 
 teamnames : List[str] = []
@@ -27,7 +26,10 @@ def prepareData(input_filepath):
     matchIDs.sort()
     return
 
-def benchmark(input_data, verification_data):
+def benchmark(training_data, verification_data):
+
+    input_data = training_data
+
     train(input_data, "outputs/validation_elos.csv")
 
     with open("outputs/validation_elos.csv", 'r') as f:
