@@ -1,5 +1,6 @@
 from typing import Dict, List
 import math
+from .model import expected_score
 
 teamnames : List[str] = []
 teams : Dict[str, List[int]] = {}
@@ -17,8 +18,7 @@ def predict(ratings, team1, team2):
     if team1 not in teamnames or team2 not in teamnames:
         return False
     else:
-        exponent = (teams[team2][0] - teams[team1][0]) / 400
-        prob = 1 / (1 + math.pow(10, exponent))
+        prob = expected_score(teams[team1][0], teams[team2][0])
 
         print(f'{team1} has a {round(prob*100)}% chance of winning')
         return True

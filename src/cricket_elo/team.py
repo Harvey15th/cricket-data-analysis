@@ -9,6 +9,9 @@ class team:
     def get_elo(self):
         return self.elo
 
+    def set_elo(self, elo):
+        self.elo = elo
+        
     def add_match(self):
         self.matches_played += 1
 
