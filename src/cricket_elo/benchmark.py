@@ -46,8 +46,8 @@ def benchmark(training_data, verification_data):
 
     for matchID in matchIDs:
         match = matches[matchID]
-        team1 = teams[match]
-        team2 = teams[match]
+        team1 = teams[match[0]]
+        team2 = teams[match[1]]
         prob = expected_score(int(team1[0]), int(team2[0]))
 
         score = score_for_team(match[2], match[0])

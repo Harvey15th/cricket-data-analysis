@@ -13,16 +13,18 @@ def train(input_filepath, output_path):
 
     for matchID in matchIDs:
         match = matches[matchID]
+        score = score_for_team(match[2], match[0])
 
-        Ka = select_k_factor(teams[match[0]].match_history()['matches_played'])
-        Kb = select_k_factor(teams[match[1]].match_history()['matches_played'])
+        if score != 'no result':
+            Ka = select_k_factor(teams[match[0]].match_history()['matches_played'])
+            Kb = select_k_factor(teams[match[1]].match_history()['matches_played'])
 
-        team1elo, team2elo = adjust_elo(teams[match[0]].get_elo(), teams[match[1]].get_elo(), Ka, Kb, score_for_team(match[2], teams[match[0]]))
-        teams[match[0]].set_elo(team1elo)
-        teams[match[1]].set_elo(team2elo)
+            team1elo, team2elo = adjust_elo(teams[match[0]].get_elo(), teams[match[1]].get_elo(), Ka, Kb, score)
+            teams[match[0]].set_elo(team1elo)
+            teams[match[1]].set_elo(team2elo)
 
-        teams[match[0]].add_match()
-        teams[match[1]].add_match()
+            teams[match[0]].add_match()
+            teams[match[1]].add_match()
 
     for teamname in teamnames:
         with open(output_path, 'a') as f:
