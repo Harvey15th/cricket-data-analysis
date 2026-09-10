@@ -1,8 +1,8 @@
 
 import argparse
-from train import train
-from benchmark import benchmark
-from predict import predict
+from .train import train
+from .benchmark import benchmark
+from .predict import predict
 MODE_CHOICES = ['train', 'predict', 'benchmark']
 
 if __name__ == "__main__":

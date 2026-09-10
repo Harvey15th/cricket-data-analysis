@@ -1,4 +1,4 @@
-from team import team
+from .team import team
 from typing import List, Dict
 import math
 

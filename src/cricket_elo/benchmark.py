@@ -1,5 +1,4 @@
-from team import team
-from train import adjust_elo, train, expProb
+from .train import adjust_elo, train, expProb
 from typing import Dict, List
 
 teamnames : List[str] = []
