@@ -35,5 +35,3 @@ def prepare(input, output):
             f.write(processed_data)
 
     return True
-
-            

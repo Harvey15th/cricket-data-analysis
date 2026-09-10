@@ -1,4 +1,5 @@
-from .train import adjust_elo, train, expProb
+from .train import train
+from .model import adjust_elo, expected_score, score_for_team, select_k_factor
 from typing import Dict, List
 
 teamnames : List[str] = []
@@ -44,28 +45,23 @@ def benchmark(training_data, verification_data):
     length = len(matchIDs)
 
     for matchID in matchIDs:
-        team1 = teams[matches[matchID][0]]
-        team2 = teams[matches[matchID][1]]
-        prob = expProb(int(team1[0]), int(team2[0]))
+        match = matches[matchID]
+        team1 = teams[match]
+        team2 = teams[match]
+        prob = expected_score(int(team1[0]), int(team2[0]))
 
-        if matches[matchID][2] == 'no result':
+        score = score_for_team(match[2], match[0])
+        if score == 'no result':
             continue
-        elif matches[matchID][2] == 'tie':
-            score = 0.5
-        elif matches[matchID][2] == team1:
-            score = 1
-        else:
-            score = 0
+        
         squareError += (score - prob)**2
 
-        Ka = 64 if int(teams[matches[matchID][0]][1]) >= 7 else 100
-        Kb = 64 if int(teams[matches[matchID][1]][1]) >= 7 else 100
+        Ka = select_k_factor(int(teams[match[0]][1]))
+        Kb = select_k_factor((teams[match[1]][1]))
 
-        teams[matches[matchID][0]][1] += 1
-        teams[matches[matchID][1]][1] += 1
-
-        teams[matches[matchID][0]][0] += (score-prob) * Ka
-        teams[matches[matchID][1]][0] += (prob-score) * Kb
+        teams[match[0]][0], teams[match[1]][0] = adjust_elo(int(team1[0]), int(team2[0]), Ka, Kb, score)
+        teams[match[0]][1] += 1
+        teams[match[1]][1] += 1
 
     squareError /= length
     print(f"Square Error is {squareError}")
