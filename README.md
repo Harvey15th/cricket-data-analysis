@@ -1,219 +1,254 @@
 # Cricket Elo
 
-A Python project for analysing historical men's Twenty20 International (T20I) cricket matches using an Elo rating system.
+[![Tests](https://github.com/Harvey15th/cricket-data-analysis/actions/workflows/tests.yml/badge.svg)](https://github.com/Harvey15th/cricket-data-analysis/actions/workflows/tests.yml)
 
-The project aims to convert raw match data into a consistent format, maintain chronological team ratings, evaluate the quality of those ratings and estimate pre-match win probabilities.
+A Python command-line project for analysing historical men's Twenty20 International (T20I) cricket matches using Elo ratings.
 
-## The Problem
+Cricket Elo prepares raw match data, trains team ratings, evaluates pre-match predictions against a 50/50 baseline, exports individual predictions, and plots cumulative prediction error. It is an educational project focused on practical Python development and reproducible model evaluation.
 
-Given a collection of historical T20I matches in JSON format, this project aims to:
+## What the project does
 
-1. Convert the raw files into a consistent match-level dataset.
-2. Process matches chronologically.
-3. Calculate each team's Elo rating after every completed match.
-4. Generate pre-match win probabilities.
-5. Evaluate those probabilities against historical results and a simple baseline.
-6. Provide a consistent command-line interface for preparing data, running evaluations and viewing results.
+- Converts Cricsheet JSON files into a consistent match-level CSV.
+- Processes matches in deterministic `(date, match_id)` order.
+- Trains Elo ratings with a separate K-factor for each team.
+- Estimates a matchup using previously generated ratings.
+- Evaluates later matches by predicting first and updating ratings afterwards.
+- Reports Brier score, a constant-probability baseline, and evaluated/skipped match counts.
+- Exports per-match predictions and plots cumulative average Brier score.
+- Runs automated unit and integration tests locally and through GitHub Actions.
 
-The main challenge is ensuring that every prediction uses only information that would have been available before the match. This prevents future information from leaking into the evaluation.
+The package and CLI are implemented. Reproducing the walkthrough from a fresh clone and publishing a tagged release are the final checks for the first versioned release.
 
-## Why Elo?
+## Installation
 
-The Elo rating system accounts for the relative strength of the two teams involved in a match.
+Requires **Python 3.12 or later** and Git. Matplotlib is installed through the package dependencies; the `dev` extra installs pytest.
 
-Defeating a highly rated opponent should produce a larger rating increase than defeating a much weaker opponent. Similarly, an unexpected loss should have a greater effect than a loss that the model already considered likely.
+The walkthrough below uses **Windows PowerShell**. Run commands from the repository root. It calls the virtual environment's Python directly, so activating the environment is unnecessary.
 
-Elo also provides an interpretable expected score that can be used as a pre-match win probability. This makes it a useful baseline before attempting more complicated statistical or machine-learning models.
+```powershell
+git clone https://github.com/Harvey15th/cricket-data-analysis.git
+Set-Location cricket-data-analysis
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.\.venv\Scripts\python.exe -m cricket_elo --help
+```
 
-## Project Status
+If the repository is already cloned, start with `python -m venv .venv` from its root. The `-e` installation lets changes to the source code take effect without reinstalling the package. Reinstall after changing package dependencies.
 
-This project is currently an early prototype and is still under active development.
+On macOS or Linux, the equivalent virtual-environment interpreter is `.venv/bin/python`; the application subcommands and arguments are the same. The download, extraction, and here-string examples below use PowerShell syntax.
 
-The current implementation can:
+## Data source
 
-* Convert a directory of Cricsheet JSON files into a simplified CSV dataset.
-* Train basic Elo ratings from processed match data.
-* Export final team ratings.
-* Estimate the win probability between two known teams.
-* Run an experimental benchmark on a later group of matches.
+The project uses match data published by [Cricsheet](https://cricsheet.org/downloads/). Download the [men's T20I JSON archive](https://cricsheet.org/downloads/t20s_male_json.zip); the [JSON format documentation](https://cricsheet.org/format/json/) describes its fields.
 
-The current benchmark is not yet considered reliable because several correctness and evaluation issues still need to be fixed. Results produced by the current version should therefore not be treated as validated forecasting evidence.
+Archive coverage changes as matches are added or revised. Keep the same archive and cutoff date when reproducing a particular result. Raw JSON, downloaded ZIP archives, and generated CSVs are excluded from Git and must be obtained or generated locally.
 
-This is an educational data-analysis project and is not intended for real-time or wagering decisions.
+## Run the complete workflow
 
-## Data Source
+### 1. Download and extract the raw data
 
-The project is designed around match data published by [Cricsheet](https://cricsheet.org/), an open cricket-data project.
+```powershell
+New-Item -ItemType Directory -Force -Path "data", "data/processed", "outputs" | Out-Null
+Invoke-WebRequest -Uri "https://cricsheet.org/downloads/t20s_male_json.zip" -OutFile "data/t20s_male_json.zip"
+Expand-Archive -Path "data/t20s_male_json.zip" -DestinationPath "data/t20s_male_json/full_dataset" -Force
+```
 
-Useful resources:
+The match JSON files should sit directly inside `data/t20s_male_json/full_dataset`. If you already have the archive, extract it there and create the `data/processed` and `outputs` folders.
 
-* [Cricsheet downloads](https://cricsheet.org/downloads/)
-* [Men's T20I JSON download](https://cricsheet.org/downloads/t20s_male_json.zip)
-* [Cricsheet JSON format documentation](https://cricsheet.org/format/json/)
-* [Kaggle mirror of the Cricsheet data](https://www.kaggle.com/datasets/suvroo/cricsheet-public-data/data)
+For a repeat run with an updated dataset, use a fresh extraction directory so removed or renamed matches from an older archive are not retained.
 
-The current local dataset contains men's T20I matches beginning in 2005. Coverage depends on the date on which the Cricsheet archive was downloaded.
+### 2. Prepare the match CSV
 
-Raw data and generated CSV files are excluded from Git because of their size. Anyone reproducing the project must download the data separately and follow the relevant Cricsheet attribution and licensing requirements.
+```powershell
+.\.venv\Scripts\python.exe -m cricket_elo prepare --input data/t20s_male_json/full_dataset --output data/processed/matches.csv
+```
 
-## Repository Structure
+The output has one row per match and these headers:
 
 ```text
-cricket-data-analysis/
-├── README.md
-├── LICENSE
-├── docs/
-│   ├── DESIGN-SPEC.md
-│   └── git-recovery.md
-├── data/
-│   ├── processed/
-│   │   ├── matches.csv
-│   │   └── benchmarkData.csv
-│   └── t20s_male_json/
-│       └── full_dataset/
-├── outputs/
-│   ├── resulting_elo.csv
-│   └── validation_elos.csv
-├── src/
-│   └── cricket_elo/
-│       ├── __main__.py
-│       ├── prepare.py
-│       ├── team.py
-│       ├── train.py
-│       ├── predict.py
-│       └── benchmark.py
-└── tests/
+match_id,date,team1,team2,result,match_type
 ```
 
-The `data` and `outputs` directories shown above are generated locally and may not be present in a fresh clone.
+Dates use `YYYY-MM-DD`. The result contains the winning team's name, `tie`, or `no result`. Prepared matches are ordered by date and then by their string match ID.
 
-## Requirements
+### 3. Create separate training and verification periods
 
-The current prototype uses the Python standard library and requires Python 3.12 or later.
+This example uses matches **before 1 January 2025** for training and matches **on or after that date** for verification. Keeping whole dates in one period avoids splitting a single day across the training/verification boundary.
 
-The project does not yet have a complete installation configuration. Commands must currently be executed from the repository root.
+Paste the entire block into PowerShell. It uses Python's standard library and preserves the prepared CSV's row order and headers.
 
-## Current Working Commands
+```powershell
+@'
+import csv
+from pathlib import Path
 
-These commands describe the current prototype interface. They will be replaced by package subcommands later in development.
+folder = Path("data/processed")
+cutoff = "2025-01-01"
 
-### Prepare match data
+with (folder / "matches.csv").open(newline="", encoding="utf-8") as file:
+    reader = csv.DictReader(file)
+    fields = reader.fieldnames
+    matches = list(reader)
 
-```bash
-python src/cricket_elo/prepare.py --input data/t20s_male_json/full_dataset --output data/processed/matches_new.csv
+training = [match for match in matches if match["date"] < cutoff]
+verification = [match for match in matches if match["date"] >= cutoff]
+
+if not training or not verification:
+    raise ValueError("The cutoff must leave matches in both periods.")
+
+for name, rows in [("training", training), ("verification", verification)]:
+    with (folder / f"{name}.csv").open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(rows)
+    print(f"{name}: {len(rows)} matches, {rows[0]['date']} to {rows[-1]['date']}")
+'@ | .\.venv\Scripts\python.exe -
 ```
 
-This reads the JSON files from the input directory and writes a simplified match-level CSV.
+This produces `data/processed/training.csv` and `data/processed/verification.csv`. Choose and record the cutoff before comparing model variants.
 
-The preparation script currently appends to an existing output file. Use a new output filename to avoid accidentally duplicating records.
+### 4. Evaluate Elo against the baseline
 
-### Train Elo ratings
-
-```bash
-python src/cricket_elo/__main__.py --mode train -input_data data/processed/matches.csv -output_path outputs/resulting_elo_new.csv
+```powershell
+.\.venv\Scripts\python.exe -m cricket_elo benchmark --training-data data/processed/training.csv --verification-data data/processed/verification.csv --output outputs/evaluation.csv --predictions-output outputs/predictions.csv
+Import-Csv outputs/evaluation.csv | Format-List
 ```
 
-This processes the supplied matches and writes one final rating for each team.
+`benchmark` trains internally on the training CSV, then predicts each verification match before updating the ratings with its result. The `--predictions-output` argument is optional; omit it if you only need the summary.
 
-The training command also currently appends to an existing output file, so a new output filename should be used for each run.
+The evaluation rejects unsorted periods, repeated match IDs, and invalid ordering across the training/verification boundary. A period with no decisive verification matches cannot produce a binary Brier score.
 
-### Predict a match
+### 5. Plot the evaluation
 
-```bash
-python src/cricket_elo/__main__.py --mode predict -input_data outputs/resulting_elo.csv -team_1 England -team_2 India
+```powershell
+.\.venv\Scripts\python.exe -m cricket_elo plot --eval-log outputs/predictions.csv --output outputs/brier_over_time.png
 ```
 
-This reads previously generated ratings and prints the estimated win probability for the first team.
+The chart shows the running average Brier score over decisive verification matches. Its final value should match the summary's `brier_score`, allowing for floating-point rounding. Lower is better; the 50/50 baseline is 0.25.
 
-Both team names must appear exactly as they are written in the ratings file.
+The current command also displays the plot interactively when a graphical backend is available. Close the plot window to return to the terminal. CI uses a non-interactive backend for image generation.
 
-### Run the experimental benchmark
+### 6. Train ratings on all available matches
 
-```bash
-python src/cricket_elo/__main__.py --mode benchmark -input_data data/processed/matches.csv -input_data_verification data/processed/benchmarkData.csv
+After evaluating the model, train on the full prepared dataset to generate the latest ratings for prediction:
+
+```powershell
+.\.venv\Scripts\python.exe -m cricket_elo train --input-data data/processed/matches.csv --output outputs/ratings.csv
 ```
 
-This command executes, but its metric is currently affected by known implementation errors and should not yet be interpreted.
+These ratings include the entire dataset. The earlier benchmark uses only its specified training file to initialise evaluation.
 
-## Planned Final Commands
+To display the ten highest-rated teams:
 
-The intended final interface is:
-
-```bash
-python -m cricket_elo prepare --input data/t20s_male_json --output data/processed/matches.csv
+```powershell
+Import-Csv outputs/ratings.csv | Sort-Object { [double]$_.elo } -Descending | Select-Object -First 10 | Format-Table
 ```
 
-```bash
-python -m cricket_elo evaluate --matches data/processed/matches.csv --output-dir outputs
+### 7. Estimate a matchup
+
+```powershell
+.\.venv\Scripts\python.exe -m cricket_elo predict --ratings outputs/ratings.csv --team-a "England" --team-b "India"
 ```
 
-```bash
-python -m cricket_elo rankings --ratings outputs/rankings.csv --top 20
+Use team names exactly as they appear in the ratings file. The estimate reflects ratings through the last match in the dataset.
+
+Each subcommand supports `--help`, for example:
+
+```powershell
+.\.venv\Scripts\python.exe -m cricket_elo benchmark --help
+.\.venv\Scripts\python.exe -m cricket_elo plot --help
 ```
 
-```bash
-python -m cricket_elo predict --ratings outputs/rankings.csv --team-a England --team-b India
+Successful commands return exit status `0`; failures return a non-zero status. Successful writes replace the files at the requested output paths. Use different output paths to retain earlier runs.
+
+## Model and evaluation
+
+Teams start at **1500 Elo**. For ratings $R_A$ and $R_B$, the model calculates:
+
+$$
+p_A = \frac{1}{1 + 10^{(R_B - R_A)/400}}
+$$
+
+This expected score is used as the model's probability estimate when scoring decisive matches. A result that was less expected produces a larger rating adjustment.
+
+Each team uses **K = 100** while it has played fewer than seven completed matches, then **K = 64**. K is selected using the count before the current match. Separate K-factors allow newer teams to adjust more quickly; when the factors differ, the combined rating total need not be conserved.
+
+| Outcome | Update Elo and match counts? | Include in binary Brier score? |
+|---|---|---|
+| Decisive win/loss | Yes; score 1 for the winner and 0 for the loser | Yes |
+| Tie | Yes; score 0.5 for each team | No |
+| No result | No | No |
+
+The reported Brier score is the mean of `(actual_score - p_team1) ** 2` over decisive verification matches. A constant prediction of 0.5 has Brier score **0.25** on each of those matches.
+
+`brier_improvement` is `baseline_brier_score - brier_score`: positive values mean Elo performed better than the baseline on that period; negative values mean it performed worse.
+
+See [MODEL-SPEC.md](docs/MODEL-SPEC.md) for the model rules.
+
+## Generated outputs
+
+| File used in the walkthrough | Contents |
+|---|---|
+| `data/processed/matches.csv` | Prepared match records |
+| `data/processed/training.csv` | Matches before the cutoff |
+| `data/processed/verification.csv` | Matches on or after the cutoff |
+| `outputs/ratings.csv` | Team `name`, `elo`, and `matches_played` |
+| `outputs/evaluation.csv` | Aggregate scores, improvement, counts, and period boundary dates |
+| `outputs/predictions.csv` | One record for every verification match |
+| `outputs/brier_over_time.png` | Cumulative mean Brier score chart |
+
+The summary contains `brier_score`, `baseline_brier_score`, `brier_improvement`, `matches_evaluated`, `matches_skipped`, `training_end`, and `verification_start`.
+
+Prediction records contain match details, both pre-match ratings, `p_team1`, `actual_score`, `status`, `elo_brier`, and `baseline_brier`. Status is `evaluated`, `tie`, or `no_result`. Ties and no-results have blank Brier fields; no-results also have a blank `actual_score`.
+
+## Results and limitations
+
+The example chart discussed in [RESULTS.md](docs/RESULTS.md) finishes near **0.196 Brier score**, compared with the **0.250** baseline: approximately **22% lower Brier error**. These figures are estimates from that chart. Use `outputs/evaluation.csv` for the exact numbers from your own run; a different archive or cutoff may produce different results.
+
+The model currently uses team ratings and match outcomes. It does not explicitly model venues, lineups, player availability, conditions, or margin of victory. It also has no explicit rating decay for long periods of inactivity.
+
+Evaluation uses deterministic date-and-match-ID ordering. Within a date, match IDs are a tie-breaker rather than a verified ordering by match start time. The score therefore depends on that ordering convention as well as the dataset and model rules.
+
+A lower score than the 50/50 baseline provides evidence of useful predictions in the evaluated period. Broader conclusions require additional periods, stronger baselines, and checks of probability calibration. The flattening of a cumulative-average chart also reflects averaging over more observations.
+
+Input handling targets the documented Cricsheet and processed-CSV formats; it is not a general validator for arbitrary cricket datasets. Team names must be consistent across the data and command arguments.
+
+## Tests and continuous integration
+
+Run the full suite:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -v
 ```
 
-Every command should eventually provide useful `--help` output, validate its inputs and return a non-zero exit status when it cannot complete successfully.
+Run an individual file while developing:
 
-## Known Limitations and Bugs
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests/test_predictions_export.py -v
+.\.venv\Scripts\python.exe -m pytest tests/test_plot.py -v
+```
 
-The current prototype has the following known issues:
+The suite covers Elo calculations, data preparation, training and prediction, chronological evaluation, baseline comparison, prediction exports, and plot generation. Integration tests create temporary fixtures, so running the tests does not require the full cricket dataset.
 
-* The package cannot yet be run successfully using `python -m cricket_elo`.
-* There is no `pyproject.toml` or documented installation procedure.
-* The current data-preparation output contains only six columns rather than the complete schema described in `DESIGN-SPEC.md`.
-* Data-preparation and training outputs are opened in append mode, which can duplicate data across repeated runs.
-* The parser does not sufficiently validate malformed or unsupported input files.
-* Matches are reordered by their string match IDs during training, which can destroy chronological ordering.
-* Elo updates can use different K-factors for the two teams, meaning rating points are not always conserved.
-* Several modules store state in global mutable dictionaries and lists.
-* The benchmark contains an incorrect winner comparison.
-* Ties and no-results are not yet handled consistently in the evaluation metric.
-* The benchmark does not yet report accuracy, sample size or a constant-probability baseline.
-* No automated tests have been implemented.
-* No automated GitHub Actions workflow exists.
-* Rating-history charts and other model diagnostics have not been implemented.
-* The current `.gitignore` rules are too broad to support committed JSON and CSV test fixtures.
+The [GitHub Actions workflow](.github/workflows/tests.yml) installs the package with its development dependencies and runs the suite on Ubuntu with Python 3.12. It runs for pull requests targeting `main` and pushes to `main`. Matplotlib uses the `Agg` backend to save plots without a desktop window.
 
-## Planned Milestones
+## Repository guide
 
-| Milestone                                                         | Status      |
-| ----------------------------------------------------------------- | ----------- |
-| Choose the data source and write the initial design specification | Complete    |
-| Create the initial JSON-to-CSV converter                          | Complete    |
-| Implement prototype Elo training and prediction                   | Complete    |
-| Practise a feature-branch and pull-request workflow               | Complete    |
-| Complete the README and Git recovery guide                        | In progress |
-| Convert the code into an installable Python package               | Planned     |
-| Create a consistent command-line interface                        | Planned     |
-| Extract and test pure Elo functions                               | Planned     |
-| Refactor and validate the data pipeline                           | Planned     |
-| Implement leak-free chronological evaluation                      | Planned     |
-| Compare Elo against a constant-probability baseline               | Planned     |
-| Export predictions, rankings and evaluation metrics               | Planned     |
-| Add automated tests and GitHub Actions                            | Planned     |
-| Produce charts and a results discussion                           | Planned     |
-| Test the project from a clean clone and release version 1.0       | Planned     |
-
-## Version 1.0 Definition of Done
-
-Version 1.0 will be considered complete when:
-
-* A clean clone can install the project using documented instructions.
-* One command can prepare the data reproducibly.
-* One command can reproduce the main evaluation.
-* Matches are evaluated chronologically without future-information leakage.
-* Elo results are compared with a simple baseline.
-* Predictions, rankings and metrics are exported.
-* At least five meaningful automated tests pass.
-* GitHub Actions runs the tests automatically.
-* The README explains the method, results and limitations.
-* Another person can reproduce the main result without private instructions.
+| Path | Purpose |
+|---|---|
+| `pyproject.toml` | Package metadata, dependencies, and installation configuration |
+| `src/cricket_elo/__main__.py` and `cli.py` | Module entry point and CLI argument handling |
+| `src/cricket_elo/csv_prepare.py` | JSON preparation and CSV input/output |
+| `src/cricket_elo/model.py` and `team.py` | Elo calculations and team rating state |
+| `src/cricket_elo/train.py`, `predict.py`, and `benchmark.py` | Training, matchup estimates, and evaluation |
+| `src/cricket_elo/plot_evaluation.py` | Plotting evaluation results |
+| `tests/` | Unit and integration tests |
+| `.github/workflows/tests.yml` | Automated CI test run |
+| `docs/` | [Model specification](docs/MODEL-SPEC.md), [results discussion](docs/RESULTS.md), and [Git recovery guide](docs/git-recovery.md) |
+| `data/` | Locally downloaded and processed datasets |
+| `outputs/` | Generated ratings, evaluation summaries, predictions, and charts |
 
 ## Licence
 
-See [LICENSE](LICENSE) for the software licence.
-
-The cricket data belongs to its respective publishers and is subject to Cricsheet's separate terms and attribution requirements.
+The software is distributed under the [MIT licence](LICENSE). Match data is provided by Cricsheet; refer to the documentation supplied with the downloaded archive for its attribution and usage terms.
