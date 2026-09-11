@@ -3,6 +3,7 @@ from .benchmark import benchmark
 from .predict import predict
 from .csv_prepare import prepare
 from .train import train
+from .plot_evaluation import plotBrier
 
 def main_cli():
     parser = build_parser()
@@ -15,7 +16,7 @@ def main_cli():
         return 1
 
 def run_benchmark(args):
-    return benchmark(args.training_data, args.verification_data, args.output)
+    return benchmark(args.training_data, args.verification_data, args.output, args.predictions_output)
 
 def run_predict(args):
     return predict(args.ratings, args.team_a, args.team_b)
@@ -27,6 +28,8 @@ def run_train(args):
     _, _, flag = train(args.input_data, args.output)
     return flag
 
+def run_plot_brier(args):
+    return plotBrier(args.eval_log, args.output)
 
 def build_parser() -> argparse.ArgumentParser:
     """Create and return the Cricket Elo argument parser."""
@@ -122,5 +125,27 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="Path for the benchmark performance data.",
     )
+    benchmark_parser.add_argument(
+        "--predictions-output",
+        required=False,
+        help="Path for the benchmark logs.",
+    )
 
+    plot_parser = subparsers.add_parser(
+        "plot",
+        help="Plot average Brier score from evaluation logs.",
+    )
+    plot_parser.set_defaults(
+        func = run_plot_brier
+    )
+    plot_parser.add_argument(
+        "--eval-log",
+        required=True,
+        help="Path to the processed evaluation log.",
+    )
+    plot_parser.add_argument(
+        "--output",
+        required=True,
+        help="Path for the generated plot.",
+    )
     return parser
