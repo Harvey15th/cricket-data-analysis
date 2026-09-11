@@ -24,7 +24,8 @@ def run_prepare(args):
     return prepare(args.input, args.output)
 
 def run_train(args):
-    return train(args.input_data, args.output)
+    _, _, flag = train(args.input_data, args.output)
+    return flag
 
 
 def build_parser() -> argparse.ArgumentParser:

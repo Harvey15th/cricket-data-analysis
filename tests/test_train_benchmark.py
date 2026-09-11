@@ -1,9 +1,3 @@
-"""Integration tests for the Cricket Elo data pipeline.
-
-These tests exercise the project through its command-line interface. They require
-the package to be installed in editable mode before pytest is run.
-"""
-
 import csv
 import json
 import subprocess
@@ -295,9 +289,7 @@ def test_benchmark_trains_then_scores_a_later_match(tmp_path):
 
     training_data = tmp_path / "training.csv"
     verification_data = tmp_path / "verification.csv"
-
-    # benchmark.py currently places its intermediate ratings in this directory.
-    (tmp_path / "outputs").mkdir()
+    evaluation_path = tmp_path / "evaluation.csv"
 
     write_cricsheet_match(
         training_raw,
@@ -326,16 +318,30 @@ def test_benchmark_trains_then_scores_a_later_match(tmp_path):
         training_data,
         "--verification-data",
         verification_data,
+        "--output",
+        evaluation_path,
     )
 
     assert result.returncode == 0, result.stderr
+    assert evaluation_path.is_file(), "Benchmark did not create its evaluation CSV."
 
-    metric_line = next(
-        line for line in result.stdout.splitlines() if "error" in line.lower()
-    )
-    measured_error = float(metric_line.split()[-1])
+    fieldnames, rows = read_csv(evaluation_path)
+    required_fields = {
+        "brier_score",
+        "matches_evaluated",
+        "matches_skipped",
+        "training_end",
+        "verification_start",
+    }
+    assert required_fields.issubset(set(fieldnames or []))
+    assert len(rows) == 1, "Expected one evaluation summary row."
+    evaluation = rows[0]
 
     # Training leaves Alpha at 1550 and Beta at 1450. The verification
     # prediction is therefore approximately 0.640065 for Alpha.
     expected_error = (1 - 0.6400649998028851) ** 2
-    assert measured_error == pytest.approx(expected_error)
+    assert float(evaluation["brier_score"]) == pytest.approx(expected_error)
+    assert int(evaluation["matches_evaluated"]) == 1
+    assert int(evaluation["matches_skipped"]) == 0
+    assert evaluation["training_end"] == "2026-01-01"
+    assert evaluation["verification_start"] == "2026-02-01"

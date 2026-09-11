@@ -5,7 +5,7 @@ from .csv_prepare import readData, writeData
 def train(input_filepath, output_path = None, writesFile = True):
     teams, matches = readData(input_path=input_filepath)
 
-    if matches != matches.sort(key = lambda x: (x["date"], x["match_id"])):
+    if matches != sorted(matches, key = lambda x: (x["date"], x["match_id"])):
         return teams, matches, False
 
     for matchDict in matches:
@@ -26,6 +26,6 @@ def train(input_filepath, output_path = None, writesFile = True):
             team2.add_match()
 
     if writesFile:
-        return writeData(output_path, teams)
+        return None, None, writeData(output_path, teams)
     else:
         return teams, matches, True
