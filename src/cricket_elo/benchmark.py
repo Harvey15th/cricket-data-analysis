@@ -40,14 +40,14 @@ def verify_data(training_data, verification_data):
     
     if training_end == verification_start:
 
-        training_end = trainMatches[-1]['match_id']
-        verification_start = matches[0]['match_id']
-        if training_end > verification_start:
+        training_endID = trainMatches[-1]['match_id']
+        verification_startID = matches[0]['match_id']
+        if training_endID > verification_startID:
             return None, None, False, None, None
 
     return teams, matches, True, training_end, verification_start
     
-def benchmark(training_data, verification_data, output_path):
+def benchmark(training_data, verification_data, output_path, predictions_output = None):
     teams, matches, result, training_end, verification_start = verify_data(training_data, verification_data)
 
     if not result:
@@ -57,6 +57,7 @@ def benchmark(training_data, verification_data, output_path):
     squareError = 0
     numberOfMatches = 0
     skippedMatches = 0
+    evalLog = []
 
     for match in matches:
         team1Name = match['team1']
@@ -64,8 +65,25 @@ def benchmark(training_data, verification_data, output_path):
         team1 : team = teams[team1Name]
         team2 : team = teams[team2Name]
 
+        elo_team1_before = team1.get_elo()
+        elo_team2_before = team2.get_elo()
+
         prob = expected_score(team1.get_elo(), team2.get_elo())
         score = score_for_team(match['result'], team1Name)
+
+        result = match['result']
+        status = 'evaluated' if score == 0 or score == 1 else ('tie' if score == 0.5 else 'no_result')
+        actual_score = None if status == 'no_result' else score
+        elo_brier = (score - prob)**2 if status == 'evaluated' else None
+        baseline_brier = (score - 0.5)**2 if status == 'evaluated' else None
+
+        if predictions_output:
+            evalLog.append({'match_id' : match['match_id'], 'date' : match['date'], 'team1' : team1Name, 'team2' : team2Name,
+                        'result' : result, 'elo_team1_before' : elo_team1_before, 
+                        'elo_team2_before' : elo_team2_before, 'p_team1' : prob, 
+                        'actual_score' : actual_score, 'status' : status, 'elo_brier' : elo_brier, 
+                        'baseline_brier' : baseline_brier})
+
         if score == 'no result':
             skippedMatches += 1
             continue
@@ -73,7 +91,8 @@ def benchmark(training_data, verification_data, output_path):
         Ka = select_k_factor(team1.get_matches_played())
         Kb = select_k_factor(team2.get_matches_played())
 
-        team1elo, team2elo = adjust_elo(team1.get_elo(), team2.get_elo(), Ka, Kb, score)
+        team1elo, team2elo = adjust_elo(elo_team1_before, elo_team2_before, Ka, Kb, score)
+
         team1.set_elo(team1elo)
         team2.set_elo(team2elo)
 
@@ -96,8 +115,11 @@ def benchmark(training_data, verification_data, output_path):
     improvement = baselineSquareError - squareError
     print(f"Square Error is {squareError}")
 
-    evalLog = [{'brier_score' : squareError, 'baseline_brier_score' : baselineSquareError, 'brier_improvement' : improvement, 'matches_evaluated' : numberOfMatches, 'matches_skipped' : skippedMatches, 'training_end' : training_end, 'verification_start' : verification_start}]
-    writeDict(evalLog, output_path)
+    evalResults = [{'brier_score' : squareError, 'baseline_brier_score' : baselineSquareError, 'brier_improvement' : improvement, 'matches_evaluated' : numberOfMatches, 'matches_skipped' : skippedMatches, 'training_end' : training_end, 'verification_start' : verification_start}]
+    writeDict(evalResults, output_path)
+
+    if predictions_output:
+        writeDict(evalLog, predictions_output)
     return True
         
 
