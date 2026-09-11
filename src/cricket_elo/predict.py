@@ -1,24 +1,17 @@
-from typing import Dict, List
-import math
 from .model import expected_score
+from .csv import readData
+from .team import team
 
-teamnames : List[str] = []
-teams : Dict[str, List[int]] = {}
+def predict(ratings, team1Name, team2Name):
 
-def predict(ratings, team1, team2):
+    teams, _ = readData(elo_path=ratings)
 
-    input_filepath = ratings
-
-    with open(input_filepath, 'r') as f:
-        for line in f.readlines():
-            line = line.split(',')
-            teams.update({line[0]: [int(line[1]), int(line[2])]})
-            teamnames.append(line[0])
-
-    if team1 not in teamnames or team2 not in teamnames:
+    if team1Name not in teams or team2Name not in teams:
         return False
     else:
-        prob = expected_score(teams[team1][0], teams[team2][0])
+        team1 : team = teams[team1Name]
+        team2 : team = teams[team2Name]
+        prob = expected_score(team1.get_elo(), team2.get_elo())
 
-        print(f'{team1} has a {round(prob*100)}% chance of winning')
+        print(f'{team1Name} has a {round(prob*100)}% chance of winning')
         return True
