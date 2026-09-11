@@ -21,7 +21,10 @@ def plotBrier(evalLogPath, outputPath):
 
     plt.plot(x, y, marker='o', linestyle='-', color='b') 
 
-    plt.title("Average Brier Score throughout training")
+    y = [0.25]*len(x)
+    plt.plot(x, y, marker='o', linestyle='-', color='r') 
+
+    plt.title("Cumulative Brier Score During Verification")
     plt.xlabel("Number of matches")
     plt.ylabel("Average Brier Score")
 
