@@ -15,7 +15,7 @@ def main_cli():
         return 1
 
 def run_benchmark(args):
-    return benchmark(args.training_data, args.verification_data)
+    return benchmark(args.training_data, args.verification_data, args.output)
 
 def run_predict(args):
     return predict(args.ratings, args.team_a, args.team_b)
@@ -115,6 +115,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--verification-data",
         required=True,
         help="Path to the later verification-match data.",
+    )
+    benchmark_parser.add_argument(
+        "--output",
+        required=True,
+        help="Path for the benchmark performance data.",
     )
 
     return parser

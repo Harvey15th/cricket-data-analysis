@@ -2,8 +2,11 @@ from .team import team
 from .model import adjust_elo, score_for_team, select_k_factor
 from .csv_prepare import readData, writeData
 
-def train(input_filepath, output_path):
+def train(input_filepath, output_path = None, writesFile = True):
     teams, matches = readData(input_path=input_filepath)
+
+    if matches != matches.sort(key = lambda x: (x["date"], x["match_id"])):
+        return teams, matches, False
 
     for matchDict in matches:
         score = score_for_team(matchDict['result'], matchDict['team1'])
@@ -22,4 +25,7 @@ def train(input_filepath, output_path):
             team1.add_match()
             team2.add_match()
 
-    return writeData(output_path, teams)
+    if writesFile:
+        return writeData(output_path, teams)
+    else:
+        return teams, matches, True
