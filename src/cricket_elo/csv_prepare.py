@@ -46,9 +46,12 @@ def prepare(input, output):
     writeDict(Processed_2D, output)
     return True
 
-def readData(input_path = None, elo_path = None):
+def readData(input_path = None, elo_path = None, elos = None):
     teams = {}
     matches = []
+
+    if elos is not None:
+        teams = elos
 
     if elo_path is not None:
         teamsArray = readDict(elo_path)
