@@ -1,10 +1,23 @@
+"""Integration tests for the Cricket Elo data pipeline.
+
+These tests exercise the project through its command-line interface. They require
+the package to be installed in editable mode before pytest is run.
+"""
+
+import csv
+import json
 import subprocess
 import sys
+
 import pytest
 
 
+MATCH_FIELDS = ["match_id", "date", "team1", "team2", "result", "match_type"]
+RATING_FIELDS = ["name", "elo", "matches_played"]
+
+
 def run_cli(working_directory, *arguments):
-    """Run cricket-elo as a user would run it from the terminal."""
+    """Run Cricket Elo using the same interpreter that is running pytest."""
     return subprocess.run(
         [sys.executable, "-m", "cricket_elo", *map(str, arguments)],
         cwd=working_directory,
@@ -13,107 +26,298 @@ def run_cli(working_directory, *arguments):
     )
 
 
-def write_matches(path, rows):
-    """Create a tiny processed-match CSV fixture."""
-    lines = [",".join(row) for row in rows]
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+def write_cricsheet_match(
+    directory,
+    match_id,
+    date,
+    team1,
+    team2,
+    outcome,
+):
+    """Write the smallest Cricsheet-shaped JSON document needed by prepare."""
+    match = {
+        "info": {
+            "dates": [date],
+            "teams": [team1, team2],
+            "match_type": "T20",
+            "outcome": outcome,
+        }
+    }
+
+    filepath = directory / f"{match_id}.json"
+    filepath.write_text(json.dumps(match), encoding="utf-8")
+
+
+def read_csv(path):
+    """Return a CSV file's field names and rows."""
+    with path.open(newline="", encoding="utf-8") as file:
+        reader = csv.DictReader(file)
+        return reader.fieldnames, list(reader)
 
 
 def read_ratings(path):
-    """Read the generated ratings into a convenient dictionary."""
-    ratings = {}
+    """Load a ratings CSV and convert its numeric fields at the test boundary."""
+    fieldnames, rows = read_csv(path)
+    assert fieldnames == RATING_FIELDS
 
-    for line in path.read_text(encoding="utf-8").splitlines():
-        team_name, rating, matches_played = line.split(",")
-
-        ratings[team_name] = {
-            "rating": float(rating),
-            "matches_played": int(matches_played),
+    return {
+        row["name"]: {
+            "elo": float(row["elo"]),
+            "matches_played": int(row["matches_played"]),
         }
+        for row in rows
+    }
 
-    return ratings
 
-
-def test_training_one_team_a_win(tmp_path):
-    training_data = tmp_path / "training.csv"
-    output_file = tmp_path / "ratings.csv"
-
-    write_matches(
-        training_data,
-        [
-            ["001", "2026-01-01", "Alpha", "Beta", "Alpha", "T20"],
-        ],
+def prepare_matches(working_directory, raw_directory, output_path):
+    """Run preparation and include stderr in the assertion on failure."""
+    result = run_cli(
+        working_directory,
+        "prepare",
+        "--input",
+        raw_directory,
+        "--output",
+        output_path,
     )
+
+    assert result.returncode == 0, result.stderr
+    return result
+
+
+def test_prepare_writes_header_and_deterministic_order(tmp_path):
+    raw_directory = tmp_path / "raw"
+    raw_directory.mkdir()
+    output_path = tmp_path / "matches.csv"
+
+    # Deliberately create these in an order different from the required output.
+    write_cricsheet_match(
+        raw_directory,
+        "200",
+        "2026-02-01",
+        "Alpha",
+        "Beta",
+        {"winner": "Alpha"},
+    )
+    write_cricsheet_match(
+        raw_directory,
+        "102",
+        "2026-01-01",
+        "Gamma",
+        "Delta",
+        {"winner": "Delta"},
+    )
+    write_cricsheet_match(
+        raw_directory,
+        "101",
+        "2026-01-01",
+        "Epsilon",
+        "Zeta",
+        {"winner": "Epsilon"},
+    )
+    (raw_directory / "notes.txt").write_text("not match data", encoding="utf-8")
+
+    prepare_matches(tmp_path, raw_directory, output_path)
+
+    fieldnames, rows = read_csv(output_path)
+
+    assert fieldnames == MATCH_FIELDS
+    assert [row["match_id"] for row in rows] == ["101", "102", "200"]
+
+
+def test_prepare_normalises_tie_and_no_result(tmp_path):
+    raw_directory = tmp_path / "raw"
+    raw_directory.mkdir()
+    output_path = tmp_path / "matches.csv"
+
+    write_cricsheet_match(
+        raw_directory,
+        "001",
+        "2026-01-01",
+        "Alpha",
+        "Beta",
+        {"result": "tie"},
+    )
+    write_cricsheet_match(
+        raw_directory,
+        "002",
+        "2026-01-02",
+        "Alpha",
+        "Beta",
+        {"result": "no result"},
+    )
+
+    prepare_matches(tmp_path, raw_directory, output_path)
+    _, rows = read_csv(output_path)
+
+    assert [row["result"] for row in rows] == ["tie", "no result"]
+
+
+def test_prepare_overwrites_instead_of_duplicating_output(tmp_path):
+    raw_directory = tmp_path / "raw"
+    raw_directory.mkdir()
+    output_path = tmp_path / "matches.csv"
+
+    write_cricsheet_match(
+        raw_directory,
+        "001",
+        "2026-01-01",
+        "Alpha",
+        "Beta",
+        {"winner": "Alpha"},
+    )
+
+    prepare_matches(tmp_path, raw_directory, output_path)
+    first_output = output_path.read_text(encoding="utf-8")
+
+    prepare_matches(tmp_path, raw_directory, output_path)
+    second_output = output_path.read_text(encoding="utf-8")
+
+    _, rows = read_csv(output_path)
+    assert second_output == first_output
+    assert len(rows) == 1
+
+
+def test_prepare_rejects_winner_that_did_not_play(tmp_path):
+    raw_directory = tmp_path / "raw"
+    raw_directory.mkdir()
+    output_path = tmp_path / "matches.csv"
+
+    write_cricsheet_match(
+        raw_directory,
+        "001",
+        "2026-01-01",
+        "Alpha",
+        "Beta",
+        {"winner": "Gamma"},
+    )
+
+    result = run_cli(
+        tmp_path,
+        "prepare",
+        "--input",
+        raw_directory,
+        "--output",
+        output_path,
+    )
+
+    assert result.returncode != 0
+
+
+def test_prepared_data_can_be_trained_and_no_result_is_skipped(tmp_path):
+    raw_directory = tmp_path / "raw"
+    raw_directory.mkdir()
+    matches_path = tmp_path / "matches.csv"
+    ratings_path = tmp_path / "ratings.csv"
+
+    write_cricsheet_match(
+        raw_directory,
+        "001",
+        "2026-01-01",
+        "Alpha",
+        "Beta",
+        {"winner": "Alpha"},
+    )
+    write_cricsheet_match(
+        raw_directory,
+        "002",
+        "2026-01-02",
+        "Alpha",
+        "Beta",
+        {"result": "no result"},
+    )
+
+    prepare_matches(tmp_path, raw_directory, matches_path)
 
     result = run_cli(
         tmp_path,
         "train",
         "--input-data",
-        training_data,
+        matches_path,
         "--output",
-        output_file,
+        ratings_path,
     )
 
     assert result.returncode == 0, result.stderr
 
-    ratings = read_ratings(output_file)
-
-    assert ratings["Alpha"]["rating"] == pytest.approx(1550)
-    assert ratings["Beta"]["rating"] == pytest.approx(1450)
+    ratings = read_ratings(ratings_path)
+    assert ratings["Alpha"]["elo"] == pytest.approx(1550)
+    assert ratings["Beta"]["elo"] == pytest.approx(1450)
     assert ratings["Alpha"]["matches_played"] == 1
     assert ratings["Beta"]["matches_played"] == 1
 
 
-def test_training_no_result_changes_nothing(tmp_path):
-    training_data = tmp_path / "training.csv"
-    output_file = tmp_path / "ratings.csv"
+def test_prediction_can_use_generated_ratings(tmp_path):
+    raw_directory = tmp_path / "raw"
+    raw_directory.mkdir()
+    matches_path = tmp_path / "matches.csv"
+    ratings_path = tmp_path / "ratings.csv"
 
-    write_matches(
-        training_data,
-        [
-            ["001", "2026-01-01", "Alpha", "Beta", "no result", "T20"],
-        ],
+    write_cricsheet_match(
+        raw_directory,
+        "001",
+        "2026-01-01",
+        "Alpha",
+        "Beta",
+        {"winner": "Alpha"},
     )
 
-    result = run_cli(
+    prepare_matches(tmp_path, raw_directory, matches_path)
+    training_result = run_cli(
         tmp_path,
         "train",
         "--input-data",
-        training_data,
+        matches_path,
         "--output",
-        output_file,
+        ratings_path,
+    )
+    assert training_result.returncode == 0, training_result.stderr
+
+    prediction_result = run_cli(
+        tmp_path,
+        "predict",
+        "--ratings",
+        ratings_path,
+        "--team-a",
+        "Alpha",
+        "--team-b",
+        "Beta",
     )
 
-    assert result.returncode == 0, result.stderr
-
-    ratings = read_ratings(output_file)
-
-    assert ratings["Alpha"]["rating"] == pytest.approx(1500)
-    assert ratings["Beta"]["rating"] == pytest.approx(1500)
-    assert ratings["Alpha"]["matches_played"] == 0
-    assert ratings["Beta"]["matches_played"] == 0
+    assert prediction_result.returncode == 0, prediction_result.stderr
+    assert "Alpha has a 64% chance of winning" in prediction_result.stdout
 
 
-def test_benchmark_trains_then_evaluates_new_match(tmp_path):
+def test_benchmark_trains_then_scores_a_later_match(tmp_path):
+    training_raw = tmp_path / "training_raw"
+    verification_raw = tmp_path / "verification_raw"
+    training_raw.mkdir()
+    verification_raw.mkdir()
+
     training_data = tmp_path / "training.csv"
     verification_data = tmp_path / "verification.csv"
 
-    # benchmark.py currently writes this file to a fixed outputs directory.
+    # benchmark.py currently places its intermediate ratings in this directory.
     (tmp_path / "outputs").mkdir()
 
-    write_matches(
-        training_data,
-        [
-            ["001", "2026-01-01", "Alpha", "Beta", "Alpha", "T20"],
-        ],
+    write_cricsheet_match(
+        training_raw,
+        "001",
+        "2026-01-01",
+        "Alpha",
+        "Beta",
+        {"winner": "Alpha"},
+    )
+    write_cricsheet_match(
+        verification_raw,
+        "002",
+        "2026-02-01",
+        "Alpha",
+        "Beta",
+        {"winner": "Alpha"},
     )
 
-    write_matches(
-        verification_data,
-        [
-            ["002", "2026-02-01", "Alpha", "Beta", "Alpha", "T20"],
-        ],
-    )
+    prepare_matches(tmp_path, training_raw, training_data)
+    prepare_matches(tmp_path, verification_raw, verification_data)
 
     result = run_cli(
         tmp_path,
@@ -127,14 +331,11 @@ def test_benchmark_trains_then_evaluates_new_match(tmp_path):
     assert result.returncode == 0, result.stderr
 
     metric_line = next(
-        line
-        for line in result.stdout.splitlines()
-        if line.startswith("Square Error is ")
+        line for line in result.stdout.splitlines() if "error" in line.lower()
     )
-    measured_error = float(metric_line.removeprefix("Square Error is "))
+    measured_error = float(metric_line.split()[-1])
 
-    # Training produces ratings of 1550 and 1450.
-    # Their next-match expected score is approximately 0.640065.
+    # Training leaves Alpha at 1550 and Beta at 1450. The verification
+    # prediction is therefore approximately 0.640065 for Alpha.
     expected_error = (1 - 0.6400649998028851) ** 2
-
     assert measured_error == pytest.approx(expected_error)

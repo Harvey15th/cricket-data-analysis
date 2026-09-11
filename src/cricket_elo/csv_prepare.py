@@ -33,37 +33,43 @@ def prepare(input, output):
             match_type = matchData['info']['match_type']
             try:
                 winner = matchData['info']['outcome']['winner']
-                processed_data = {'match_id' : match_id, 'date' : date, 'team1' : team_1, 'team2' : team_2, 'result' : winner, 'match_type' : match_type}
+                if winner == team_1 or winner == team_2:
+                    processed_data = {'match_id' : match_id, 'date' : date, 'team1' : team_1, 'team2' : team_2, 'result' : winner, 'match_type' : match_type}
+                else:
+                    return False
             except:
                 result = matchData['info']['outcome']['result']
                 processed_data = {'match_id' : match_id, 'date' : date, 'team1' : team_1, 'team2' : team_2, 'result' : result, 'match_type' : match_type}
             Processed_2D.append(processed_data)
 
-    Processed_2D.sort(key = lambda x: x['date'])
+    Processed_2D.sort(key = lambda x: (x["date"], x["match_id"]))
     writeDict(Processed_2D, output)
+    return True
 
 def readData(input_path = None, elo_path = None):
-    teams = []
+    teams = {}
+    matches = []
+
     if elo_path is not None:
         teamsArray = readDict(elo_path)
         for teamDict in teamsArray:
             newTeam : team = team()
-            newTeam.set_elo(teamDict['elo'])
-            newTeam.set_matches_played(teamDict['matches_played'])
-            teams.append([teamDict['name'], newTeam])
+            newTeam.set_elo(float(teamDict['elo']))
+            newTeam.set_matches_played(int(teamDict['matches_played']))
+            teams.update({teamDict['name'] : newTeam})
 
     if input_path is not None:
         matches = readDict(input_path)
 
         for match in matches:
             team1Name = match['team1']
-            team2Name = match['team1']
+            team2Name = match['team2']
             if team1Name not in teams:
                 team1 = team()
-                teams.append({team1Name : team1})
+                teams.update({team1Name : team1})
             if team2Name not in teams:
                 team2 = team()
-                teams.append({team2Name : team2})
+                teams.update({team2Name : team2})
 
     return teams, matches
 
