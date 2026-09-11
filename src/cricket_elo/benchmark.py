@@ -1,6 +1,6 @@
 from .train import train
 from .model import adjust_elo, expected_score, score_for_team, select_k_factor
-from .csv import readData
+from .csv_prepare import readData
 from .team import team
 
 TRAINED_ELOS = "outputs/validation_elos.csv"

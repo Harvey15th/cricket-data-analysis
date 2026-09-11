@@ -1,5 +1,5 @@
 from .model import expected_score
-from .csv import readData
+from .csv_prepare import readData
 from .team import team
 
 def predict(ratings, team1Name, team2Name):
