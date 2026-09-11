@@ -1,7 +1,7 @@
 import argparse
 from .benchmark import benchmark
 from .predict import predict
-from .prepare import prepare
+from .csv_prepare import prepare
 from .train import train
 
 def main_cli():

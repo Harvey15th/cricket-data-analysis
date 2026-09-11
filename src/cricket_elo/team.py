@@ -15,7 +15,8 @@ class team:
     def add_match(self):
         self.matches_played += 1
 
-    def match_history(self):
-        return {
-            'matches_played': self.matches_played,
-        }
+    def get_matches_played(self):
+        return self.matches_played
+
+    def set_matches_played(self, newVal):
+        self.matches_played = newVal
